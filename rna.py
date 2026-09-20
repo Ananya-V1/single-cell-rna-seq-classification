@@ -24,7 +24,8 @@ adata = adata[:, adata.var.highly_variable].copy()
 
 # Saves the values
 adata.layers['log_norm'] = adata.X.copy()
-# Center genes to mean = 0, std = 1
+# Center genes to mean = 0, std = 1; equalize the scale for all the genes
+# train model on patterns in variations of genes not pure values of genes
 sc.pp.scale(adata)
 
 
