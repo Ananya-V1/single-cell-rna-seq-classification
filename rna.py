@@ -7,14 +7,15 @@ from sklearn.inspection import permutation_importance
 from sklearn.metrics import accuracy_score, classification_report
 
 adata = sc.datasets.pbmc3k()
+print(adata)
 
 print(adata.X.shape)
-print(adata.obs.head())
-print(adata.var.head())
+print(adata.obs.head()) # row metadata
+print(adata.var.head()) # columns of adata.X
 
 # Scale cells so total gene count sums to 10000
 sc.pp.normalize_total(adata, target_sum=1e4)
-# Compress range
+# Compress range; log the data since it skewes
 sc.pp.log1p(adata)
 
 # Keeps 2000 most variable genes; remove other genes to reduce noise
@@ -33,11 +34,13 @@ sc.pp.neighbors(adata, n_neighbors=10, n_pcs=40)
 sc.tl.leiden(adata, flavor="igraph", n_iterations=2, directed=False)
 
 cluster_counts = adata.obs['leiden'].value_counts()
+print(cluster_counts) # print number of cells group in each cluster and the cluster id
 
 # Removes clusters with < 50; not enough information to train
 keep = cluster_counts[cluster_counts >= 50].index
 adata = adata[adata.obs['leiden'].isin(keep)].copy()
 
+# use leiden (unsupervised clustering method) to find cells that cluster together and give them a shared label
 X = adata.X
 y = adata.obs['leiden'] # leiden clusters based on cell type
 
@@ -49,6 +52,7 @@ X_train, X_test, y_train, y_test = train_test_split(
 )
 
 # Predict cell type based on cell's gene expression
+# use the labels from the leiden clustering as supervised learning
 # Random Forest
 rf = RandomForestClassifier(n_estimators=200, random_state=42, class_weight='balanced')
 rf.fit(X_train, y_train)
@@ -93,13 +97,15 @@ plt.close()
 
 # Marker genes
 adata.X = adata.layers['log_norm']
+# Wilcoxon rank-sum test compares the cluster's gene expression against all other cells
+# find marker genes to identify the cluster types
 sc.tl.rank_genes_groups(adata, groupby='leiden', method='wilcoxon')
 
 for cluster in adata.obs['leiden'].unique():
     genes = adata.uns['rank_genes_groups']['names'][cluster][:10]
     print(f"Cluster {cluster}: {genes}")
 
-# Cell type annotation -> maps cluster IDS to cell type names
+# Cell type annotation -> maps cluster IDS (assigned from leiden clsutering) to cell type names
 celltype = {
     '0': 'CD4 T cells',
     '1': 'CD4 T cells',
